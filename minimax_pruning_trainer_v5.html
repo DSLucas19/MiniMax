@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Minimax Alpha–Beta Pruning Trainer v5</title>
+<style>
+  :root{
+    --bg:#f5f5f2;
+    --panel:#ffffff;
+    --ink:#171717;
+    --panel2:#fbfbfd;
+    --shadow:0 18px 50px rgba(20,20,30,.08);
+    --muted:#777;
+    --line:#cfcfc8;
+    --good:#147a45;
+    --bad:#b83232;
+    --warn:#9a6a12;
+    --max:#2563eb;
+    --min:#dc2626;
+    --leaf:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+  }
+  header{
+    padding:18px 22px 12px;
+    border-bottom:1px solid #ddd;
+    background:rgba(255,255,255,.9);
+    position:sticky;
+    top:0;
+    z-index:10;
+    backdrop-filter:blur(10px);
+  }
+  .top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  h1{font-size:20px;margin:0;letter-spacing:-.02em}
+  .subtitle{color:var(--muted);font-size:13px;margin-top:4px}
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:end;
+    gap:10px;
+  }
+  .control{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  input, select, button{font:inherit}
+  input[type="number"], select{
+    width:88px;height:36px;border:1px solid #cfcfc9;border-radius:9px;padding:0 9px;background:white;color:var(--ink);
+  }
+  button{
+    height:36px;border-radius:9px;border:1px solid #cfcfc9;padding:0 13px;cursor:pointer;background:#fff;color:var(--ink);font-weight:650;
+  }
+  button.primary{background:#171717;color:white;border-color:#171717}
+  button:hover{transform:translateY(-1px)}
+  .legend{margin-top:12px;display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+  .legend b{color:var(--ink)}
+  main{padding:18px}
+  .statusbar{
+    max-width:1400px;
+    margin:0 auto 12px;
+    background:var(--panel);
+    border:1px solid #ddd;
+    border-radius:12px;
+    padding:11px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    font-size:13px;
+  }
+  #message{font-weight:650}
+  #score{color:var(--muted)}
+  #canvasWrap{
+    max-width:1400px;
+    margin:auto;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(37,99,235,.05), transparent 34%),
+      radial-gradient(circle at 80% 10%, rgba(220,38,38,.045), transparent 34%),
+      linear-gradient(180deg, #fff 0%, var(--panel2) 100%);
+    border:1px solid #dedee5;
+    border-radius:20px;
+    overflow:hidden;
+    min-height:380px;
+    position:relative;
+    padding:14px;
+    box-shadow:var(--shadow);
+  }
+  svg{
+    display:block;
+    width:100%;
+    height:auto;
+  }
+  .edge{stroke:#c9cbd3;stroke-width:2.2;transition:.2s;stroke-linecap:round}
+  .edge.faded{opacity:.14}
+  .node{cursor:pointer;transition:.2s}
+  .node text{pointer-events:none;user-select:none}
+  .node .role{font-size:11px;fill:#fff;font-weight:800}
+  .node .leafValue{font-size:13px;fill:#111;font-weight:800}
+  .node .mmValue{font-size:12px;fill:#333;font-weight:700}
+  .node.predicted .xmark{opacity:1}
+  .node.faded{opacity:.18}
+  .node.correct .shape,.node.correct circle{stroke:var(--good)!important;stroke-width:4!important}
+  .node.wrong .shape,.node.wrong circle{stroke:var(--bad)!important;stroke-width:4!important}
+  .node.missed .shape,.node.missed circle{stroke:var(--warn)!important;stroke-width:4!important;stroke-dasharray:5 4}
+  .leaf circle{fill:var(--leaf);stroke:#31323a;stroke-width:2;filter:drop-shadow(0 4px 7px rgba(0,0,0,.10))}
+  .shape{stroke:#fff;stroke-width:2.2;filter:drop-shadow(0 4px 7px rgba(0,0,0,.16))}
+  .maxNode .shape{fill:var(--max)}
+  .minNode .shape{fill:var(--min)}
+  .xmark{opacity:0;font-size:26px;font-weight:900;fill:var(--bad)}
+  .truthmark{font-size:18px;font-weight:900;fill:var(--warn)}
+  .levelLabel{fill:#8a8a84;font-size:11px;font-weight:700;letter-spacing:.08em}
+
+  .noteText{
+    font-size:12px;
+    font-weight:800;
+    fill:#374151;
+    paint-order:stroke;
+    stroke:#fff;
+    stroke-width:5px;
+    stroke-linejoin:round;
+    cursor:grab;
+    user-select:none;
+  }
+  .noteText.dragging{cursor:grabbing;fill:#111827}
+  .noteEditorFO{overflow:visible}
+  .noteEditor{
+    width:100%;height:30px;
+    border:1.5px solid #818cf8;border-radius:8px;
+    background:rgba(255,255,255,.98);
+    box-shadow:0 7px 22px rgba(79,70,229,.18);
+    padding:4px 8px;color:#1f2937;
+    font:800 12px Inter, ui-sans-serif, system-ui, sans-serif;
+    outline:none;
+  }
+  #noteMode.active{
+    background:#eef2ff;
+    border-color:#a5b4fc;
+    color:#3730a3;
+  }
+  .node.noteTarget .shape,.node.noteTarget circle{
+    filter:drop-shadow(0 0 0 rgba(0,0,0,0)) drop-shadow(0 0 8px rgba(79,70,229,.28));
+  }
+
+  @media(max-width:700px){
+    header{position:static}
+    main{padding:10px}
+    .controls{width:100%}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div>
+      <h1>Minimax Alpha–Beta Pruning Trainer</h1>
+      <div class="subtitle">MAX = tam giác xanh, MIN = tam giác đỏ lộn ngược. Duyệt trái → phải.</div>
+    </div>
+    <div class="controls">
+      <label class="control">Depth
+        <input id="depth" type="number" min="2" max="7" value="5">
+      </label>
+      <label class="control">Expand factor
+        <input id="branch" type="number" min="2" max="5" value="3">
+      </label>
+      <label class="control">Min branches
+        <input id="minBranch" type="number" min="1" max="5" value="1">
+      </label>
+      <label class="control">Root
+        <select id="rootRole">
+          <option value="MAX">MAX</option>
+          <option value="MIN">MIN</option>
+        </select>
+      </label>
+      <label class="control">Tree ordering
+        <select id="treeMode" style="width:125px">
+          <option value="random">Random</option>
+          <option value="heavy" selected>Prune-heavy</option>
+          <option value="max">Max pruning</option>
+        </select>
+      </label>
+      <button id="newTree">Random tree</button>
+      <button id="noteMode">Note mode: OFF</button>
+      <button id="clearMarks">Clear X</button>
+      <button id="check" class="primary">Check</button>
+    </div>
+  </div>
+  <div class="legend">
+    <span><b>Click node</b> = đặt / bỏ X dự đoán prune</span>
+    <span><b>Note mode</b> = click node để gõ trực tiếp · kéo note để di chuyển · double-click để sửa</span>
+    <span><b>Prune-heavy</b> = ưu tiên move ordering tốt nhưng vẫn có nhiễu</span>
+    <span><b>Variety</b> = có nhánh dừng sớm, nhánh dài, số con không đều</span>
+    <span>Đánh dấu vào <b>root của subtree</b> mà bạn nghĩ sẽ bị cắt</span>
+  </div>
+</header>
+
+<main>
+  <div class="statusbar">
+    <div id="message">Mark các node mà bạn nghĩ cả subtree bắt đầu từ đó sẽ bị prune.</div>
+    <div id="score"></div>
+  </div>
+  <div id="canvasWrap">
+    <svg id="tree" preserveAspectRatio="xMidYMin meet"></svg>
+  </div>
+</main>
+
+<script>
+(() => {
+  const svg = document.getElementById("tree");
+  const depthInput = document.getElementById("depth");
+  const branchInput = document.getElementById("branch");
+  const minBranchInput = document.getElementById("minBranch");
+  const rootRoleInput = document.getElementById("rootRole");
+  const treeModeInput = document.getElementById("treeMode");
+  const message = document.getElementById("message");
+  const score = document.getElementById("score");
+
+  let idCounter = 0;
+  let root = null;
+  let predicted = new Set();
+  let actualPruneRoots = new Set();
+  let checked = false;
+  let noteMode = false;
+  const notes = new Map(); // nodeId -> {text, dx, dy}
+  let activeEditor = null;
+  let dragState = null;
+
+  const NS = "http://www.w3.org/2000/svg";
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+  function chance(p){ return Math.random() < p; }
+
+  function roleAt(level){
+    const rootRole = rootRoleInput.value;
+    if(level % 2 === 0) return rootRole;
+    return rootRole === "MAX" ? "MIN" : "MAX";
+  }
+
+  function shouldEarlyStop(level, maxDepth){
+    if(level === 0) return false;
+    if(level >= maxDepth) return true;
+    const progress = level / maxDepth;
+    let p = 0.05 + 0.34 * progress;
+    if(level <= 1) p *= 0.35;      // tránh cây quá bé
+    if(maxDepth - level === 1) p += 0.18; // tăng khả năng leaf sớm gần đáy
+    return chance(p);
+  }
+
+  function buildTree(level, maxDepth, minB, maxB, parent=null){
+    const node = {
+      id: "n" + (++idCounter),
+      level,
+      role: roleAt(level),
+      parent,
+      children: [],
+      leafValue: null,
+      minimax: null,
+      x:0, y:0
+    };
+
+    if(level === maxDepth || shouldEarlyStop(level, maxDepth)){
+      node.leafValue = randInt(-20, 20);
+      node.minimax = node.leafValue;
+      return node;
+    }
+
+    const childCount = randInt(minB, maxB);
+    for(let i=0;i<childCount;i++){
+      node.children.push(buildTree(level+1, maxDepth, minB, maxB, node));
+    }
+    return node;
+  }
+
+  function treeStats(node){
+    let count = 1;
+    let maxLeafDepth = node.children.length ? 0 : node.level;
+    let leafCount = node.children.length ? 0 : 1;
+    node.children.forEach(c => {
+      const s = treeStats(c);
+      count += s.count;
+      maxLeafDepth = Math.max(maxLeafDepth, s.maxLeafDepth);
+      leafCount += s.leafCount;
+    });
+    return {count, maxLeafDepth, leafCount};
+  }
+
+  function computeMinimax(node){
+    if(node.children.length === 0) return node.leafValue;
+    const vals = node.children.map(computeMinimax);
+    node.minimax = node.role === "MAX" ? Math.max(...vals) : Math.min(...vals);
+    return node.minimax;
+  }
+
+  // Best-case move ordering for alpha-beta:
+  // MAX wants high minimax children first; MIN wants low minimax children first.
+  function applyMoveOrdering(node, mode){
+    if(node.children.length === 0) return;
+    node.children.forEach(c => applyMoveOrdering(c, mode));
+
+    if(mode === "random") return;
+
+    node.children.sort((a,b) =>
+      node.role === "MAX" ? b.minimax - a.minimax : a.minimax - b.minimax
+    );
+
+    if(mode === "heavy" && node.children.length > 1){
+      // Keep it learnable rather than perfectly sorted: occasionally perturb
+      // a later pair, while usually preserving the strongest child first.
+      for(let i=1;i<node.children.length-1;i++){
+        if(chance(0.22)){
+          [node.children[i], node.children[i+1]] = [node.children[i+1], node.children[i]];
+          i++;
+        }
+      }
+      if(chance(0.08)){
+        const j = randInt(1, node.children.length-1);
+        [node.children[0], node.children[j]] = [node.children[j], node.children[0]];
+      }
+    }
+  }
+
+  function countSubtreeNodes(node){
+    let n = 1;
+    node.children.forEach(c => n += countSubtreeNodes(c));
+    return n;
+  }
+
+  function analyzePruning(start){
+    const prunedRoots = [];
+    function walk(node, alpha, beta){
+      if(node.children.length === 0) return node.leafValue;
+      if(node.role === "MAX"){
+        let value = -Infinity;
+        for(let i=0;i<node.children.length;i++){
+          value = Math.max(value, walk(node.children[i], alpha, beta));
+          alpha = Math.max(alpha, value);
+          if(alpha >= beta){
+            for(let j=i+1;j<node.children.length;j++) prunedRoots.push(node.children[j]);
+            break;
+          }
+        }
+        return value;
+      }
+      let value = Infinity;
+      for(let i=0;i<node.children.length;i++){
+        value = Math.min(value, walk(node.children[i], alpha, beta));
+        beta = Math.min(beta, value);
+        if(beta <= alpha){
+          for(let j=i+1;j<node.children.length;j++) prunedRoots.push(node.children[j]);
+          break;
+        }
+      }
+      return value;
+    }
+    walk(start, -Infinity, Infinity);
+    const prunedNodes = prunedRoots.reduce((sum,n) => sum + countSubtreeNodes(n), 0);
+    return {roots:prunedRoots.length, nodes:prunedNodes};
+  }
+
+  function alphaBeta(node, alpha, beta){
+    if(node.children.length === 0) return node.leafValue;
+
+    if(node.role === "MAX"){
+      let value = -Infinity;
+      for(let i=0;i<node.children.length;i++){
+        value = Math.max(value, alphaBeta(node.children[i], alpha, beta));
+        alpha = Math.max(alpha, value);
+        if(alpha >= beta){
+          for(let j=i+1;j<node.children.length;j++) actualPruneRoots.add(node.children[j].id);
+          break;
+        }
+      }
+      return value;
+    } else {
+      let value = Infinity;
+      for(let i=0;i<node.children.length;i++){
+        value = Math.min(value, alphaBeta(node.children[i], alpha, beta));
+        beta = Math.min(beta, value);
+        if(beta <= alpha){
+          for(let j=i+1;j<node.children.length;j++) actualPruneRoots.add(node.children[j].id);
+          break;
+        }
+      }
+      return value;
+    }
+  }
+
+  function flatten(node, arr=[]){
+    arr.push(node);
+    node.children.forEach(c => flatten(c, arr));
+    return arr;
+  }
+
+  function leaves(node, arr=[]){
+    if(node.children.length===0) arr.push(node);
+    else node.children.forEach(c=>leaves(c,arr));
+    return arr;
+  }
+
+  function subtreeIds(node, set=new Set()){
+    set.add(node.id);
+    node.children.forEach(c=>subtreeIds(c,set));
+    return set;
+  }
+
+  function hasPredictedAncestor(node){
+    let p = node.parent;
+    while(p){
+      if(predicted.has(p.id)) return true;
+      p = p.parent;
+    }
+    return false;
+  }
+
+  function layoutTree(){
+    const leafList = leaves(root);
+    const depth = +depthInput.value;
+    const leafCount = leafList.length;
+
+    const marginX = 42;
+    const marginY = 42;
+    const xGap = clamp(Math.floor(1180 / Math.max(leafCount - 1, 1)), 30, 90);
+    const yGap = clamp(Math.floor(560 / Math.max(depth, 1)), 72, 110);
+
+    leafList.forEach((leaf,i)=>{
+      leaf.x = marginX + i*xGap;
+      leaf.y = marginY + leaf.level*yGap;
+    });
+
+    function setInternalX(node){
+      node.y = marginY + node.level*yGap;
+      if(node.children.length===0) return node.x;
+      const xs = node.children.map(setInternalX);
+      node.x = (xs[0] + xs[xs.length-1]) / 2;
+      return node.x;
+    }
+    setInternalX(root);
+
+    const width = Math.max(880, marginX*2 + Math.max(0, leafCount-1)*xGap + 10);
+    const maxUsedDepth = treeStats(root).maxLeafDepth;
+    const height = Math.max(360, marginY*2 + maxUsedDepth*yGap + 85);
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+  }
+
+  function el(name, attrs={}){
+    const x = document.createElementNS(NS,name);
+    Object.entries(attrs).forEach(([k,v])=>x.setAttribute(k,v));
+    return x;
+  }
+
+  function makeTriangle(up=true){
+    return up ? "0,-24 22,18 -22,18" : "0,24 22,-18 -22,-18";
+  }
+
+  function render(){
+    svg.innerHTML="";
+    layoutTree();
+    const all = flatten(root);
+
+    const depth = +depthInput.value;
+    const stats = treeStats(root);
+    for(let l=0;l<=depth;l++){
+      const t = el("text",{x:12,y:48+l*clamp(Math.floor(560 / Math.max(depth, 1)), 72, 110),class:"levelLabel"});
+      if(l < depth) t.textContent = roleAt(l);
+      else t.textContent = "MAX DEPTH";
+      svg.appendChild(t);
+    }
+
+    all.forEach(node=>{
+      node.children.forEach(child=>{
+        const y1 = node.y + (node.children.length===0 ? 18 : 20);
+        const y2 = child.y - (child.children.length===0 ? 18 : 20);
+        const midY = (y1 + y2) / 2;
+        const line = el("path",{
+          d:`M ${node.x} ${y1} C ${node.x} ${midY}, ${child.x} ${midY}, ${child.x} ${y2}`,
+          class:"edge",
+          fill:"none"
+        });
+        if(hasPredictedAncestor(child) || predicted.has(node.id)) line.classList.add("faded");
+        svg.appendChild(line);
+      });
+    });
+
+    all.forEach(node=>{
+      const classes = ["node"];
+      if(node.children.length===0) classes.push("leaf");
+      else classes.push(node.role === "MAX" ? "maxNode" : "minNode");
+      if(predicted.has(node.id)) classes.push("predicted");
+      if(hasPredictedAncestor(node)) classes.push("faded");
+      if(checked){
+        const pred = predicted.has(node.id);
+        const truth = actualPruneRoots.has(node.id);
+        if(pred && truth) classes.push("correct");
+        else if(pred && !truth) classes.push("wrong");
+        else if(!pred && truth) classes.push("missed");
+      }
+
+      const g = el("g",{class:classes.join(" "),transform:`translate(${node.x},${node.y})`});
+      g.dataset.id = node.id;
+
+      if(node.children.length===0){
+        const c = el("circle",{cx:0,cy:0,r:20});
+        g.appendChild(c);
+        const value = el("text",{x:0,y:5,"text-anchor":"middle",class:"leafValue"});
+        value.textContent = node.leafValue;
+        g.appendChild(value);
+      } else {
+        const poly = el("polygon",{points: makeTriangle(node.role === "MAX"), class:"shape"});
+        g.appendChild(poly);
+        const role = el("text",{x:0,y:4,"text-anchor":"middle",class:"role"});
+        role.textContent = node.role;
+        g.appendChild(role);
+
+        if(checked){
+          const mm = el("text",{x:0,y:38,"text-anchor":"middle",class:"mmValue"});
+          mm.textContent = "v=" + node.minimax;
+          g.appendChild(mm);
+        }
+      }
+
+      const xm = el("text",{x:18,y:-16,"text-anchor":"middle",class:"xmark"});
+      xm.textContent = "×";
+      g.appendChild(xm);
+
+      if(checked && actualPruneRoots.has(node.id) && !predicted.has(node.id)){
+        const truth = el("text",{x:-24,y:-16,"text-anchor":"middle",class:"truthmark"});
+        truth.textContent = "!";
+        g.appendChild(truth);
+      }
+
+      if(noteMode) g.classList.add("noteTarget");
+
+      g.addEventListener("click",e=>{
+        e.stopPropagation();
+
+        if(noteMode){
+          openNoteEditor(node);
+          return;
+        }
+
+        if(checked) return;
+        if(node === root) return; // root không thể bị prune
+        if(hasPredictedAncestor(node)) return;
+
+        const id = node.id;
+        if(predicted.has(id)){
+          predicted.delete(id);
+        } else {
+          const ids = subtreeIds(node);
+          [...predicted].forEach(pid => { if(ids.has(pid)) predicted.delete(pid); });
+          predicted.add(id);
+        }
+        render();
+      });
+
+      svg.appendChild(g);
+    });
+
+    drawNotes();
+  }
+
+  function svgPointFromEvent(e){
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svg.getScreenCTM();
+    return ctm ? pt.matrixTransform(ctm.inverse()) : {x:e.clientX,y:e.clientY};
+  }
+
+  function findNodeById(id){
+    return flatten(root, []).find(n => n.id === id);
+  }
+
+  function drawNotes(){
+    flatten(root, []).forEach(node => {
+      const data = notes.get(node.id);
+      if(!data || !data.text || data.text.trim() === "") return;
+
+      const note = el("text",{
+        x:node.x + data.dx,
+        y:node.y + data.dy,
+        "text-anchor":"middle",
+        class:"noteText"
+      });
+      note.textContent = data.text;
+      note.dataset.nodeId = node.id;
+
+      note.addEventListener("pointerdown", e => {
+        e.stopPropagation();
+        e.preventDefault();
+        const p = svgPointFromEvent(e);
+        dragState = {
+          nodeId:node.id,
+          startX:p.x,
+          startY:p.y,
+          startDx:data.dx,
+          startDy:data.dy,
+          el:note
+        };
+        note.classList.add("dragging");
+        try{ note.setPointerCapture(e.pointerId); }catch(_){ }
+      });
+
+      note.addEventListener("dblclick", e => {
+        e.stopPropagation();
+        openNoteEditor(node);
+      });
+
+      svg.appendChild(note);
+    });
+  }
+
+  function closeActiveEditor(save=true){
+    if(!activeEditor) return;
+    const {fo,input,node} = activeEditor;
+    const existing = notes.get(node.id) || {
+      text:"",
+      dx:0,
+      dy:node.children.length===0 ? 38 : 52
+    };
+    if(save){
+      const text = input.value.trim();
+      if(text === "") notes.delete(node.id);
+      else notes.set(node.id,{...existing,text});
+    }
+    if(fo.parentNode) fo.parentNode.removeChild(fo);
+    activeEditor = null;
+    render();
+  }
+
+  function openNoteEditor(node){
+    if(activeEditor) closeActiveEditor(true);
+
+    const current = notes.get(node.id) || {
+      text:"",
+      dx:0,
+      dy:node.children.length===0 ? 38 : 52
+    };
+    const centerX = node.x + current.dx;
+    const baselineY = node.y + current.dy;
+    const w = 150, h = 34;
+
+    const fo = el("foreignObject",{
+      x:centerX-w/2,
+      y:baselineY-23,
+      width:w,
+      height:h,
+      class:"noteEditorFO"
+    });
+    const input = document.createElement("input");
+    input.setAttribute("xmlns","http://www.w3.org/1999/xhtml");
+    input.className = "noteEditor";
+    input.value = current.text;
+    input.placeholder = "v=3, α=2, β=5...";
+    fo.appendChild(input);
+    svg.appendChild(fo);
+    activeEditor = {fo,input,node};
+
+    input.addEventListener("click",e=>e.stopPropagation());
+    input.addEventListener("pointerdown",e=>e.stopPropagation());
+    input.addEventListener("keydown",e=>{
+      if(e.key === "Enter"){
+        e.preventDefault();
+        closeActiveEditor(true);
+      }else if(e.key === "Escape"){
+        e.preventDefault();
+        closeActiveEditor(false);
+      }
+    });
+    input.addEventListener("blur",()=>{
+      if(activeEditor && activeEditor.input === input) closeActiveEditor(true);
+    });
+    requestAnimationFrame(()=>{
+      input.focus();
+      input.select();
+    });
+  }
+
+  svg.addEventListener("pointermove", e => {
+    if(!dragState) return;
+    const data = notes.get(dragState.nodeId);
+    const node = findNodeById(dragState.nodeId);
+    if(!data || !node) return;
+    const p = svgPointFromEvent(e);
+    data.dx = dragState.startDx + (p.x-dragState.startX);
+    data.dy = dragState.startDy + (p.y-dragState.startY);
+    dragState.el.setAttribute("x",node.x+data.dx);
+    dragState.el.setAttribute("y",node.y+data.dy);
+  });
+
+  function endNoteDrag(){
+    if(!dragState) return;
+    dragState.el?.classList.remove("dragging");
+    dragState = null;
+  }
+  svg.addEventListener("pointerup",endNoteDrag);
+  svg.addEventListener("pointercancel",endNoteDrag);
+  window.addEventListener("pointerup",endNoteDrag);
+
+  function buildVariedTree(depth, minB, maxB, mode){
+    let best = null;
+    let bestScore = -1;
+    const attempts = mode === "random" ? 25 : 14;
+
+    for(let tries=0; tries<attempts; tries++){
+      idCounter = 0;
+      const candidate = buildTree(0, depth, minB, maxB);
+      const st = treeStats(candidate);
+      if(st.maxLeafDepth < Math.max(2, depth - 1) || st.leafCount < 4 || st.count < 8) continue;
+
+      computeMinimax(candidate);
+      applyMoveOrdering(candidate, mode);
+
+      if(mode === "random") return candidate;
+
+      const pr = analyzePruning(candidate);
+      const score = pr.nodes / Math.max(1, st.count);
+      if(score > bestScore){
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    if(best) return best;
+    idCounter = 0;
+    const fallback = buildTree(0, depth, minB, maxB);
+    computeMinimax(fallback);
+    applyMoveOrdering(fallback, mode);
+    return fallback;
+  }
+
+  function newTree(){
+    if(activeEditor){
+      const {fo} = activeEditor;
+      if(fo.parentNode) fo.parentNode.removeChild(fo);
+      activeEditor = null;
+    }
+    dragState = null;
+    checked = false;
+    predicted.clear();
+    actualPruneRoots.clear();
+    notes.clear();
+
+    let depth = clamp(parseInt(depthInput.value) || 5, 2, 7);
+    let maxB = clamp(parseInt(branchInput.value) || 3, 2, 5);
+    let minB = clamp(parseInt(minBranchInput.value) || 1, 1, maxB);
+    depthInput.value = depth;
+    branchInput.value = maxB;
+    minBranchInput.value = minB;
+
+    if(depth >= 7 && maxB >= 5){
+      maxB = 4;
+      branchInput.value = 4;
+      message.textContent = "Depth 7 + factor 5 hơi quá tải, mình tự hạ factor xuống 4 để cây vẫn gọn và mượt.";
+    } else {
+      const modeName = treeModeInput.value === "max" ? "Max pruning" : treeModeInput.value === "heavy" ? "Prune-heavy" : "Random";
+      message.textContent = `${modeName}: mark các node mà bạn nghĩ cả subtree bắt đầu từ đó sẽ bị prune.`;
+    }
+
+    const mode = treeModeInput.value;
+    root = buildVariedTree(depth, minB, maxB, mode);
+    computeMinimax(root);
+    applyMoveOrdering(root, mode);
+    const st = treeStats(root);
+    const pr = analyzePruning(root);
+    score.textContent = `Nodes = ${st.count} · Leaves = ${st.leafCount} · Potentially pruned = ${pr.nodes}`;
+    render();
+  }
+
+  function clearMarks(){
+    if(checked){
+      checked = false;
+      actualPruneRoots.clear();
+    }
+    predicted.clear();
+    message.textContent = "Đã xóa dự đoán. Thử lại từ đầu.";
+    score.textContent = `Nodes = ${treeStats(root).count} · Leaves = ${treeStats(root).leafCount}`;
+    render();
+  }
+
+  function checkAnswer(){
+    actualPruneRoots.clear();
+    alphaBeta(root, -Infinity, Infinity);
+    checked = true;
+
+    const p = predicted;
+    const a = actualPruneRoots;
+    let correct = 0;
+    p.forEach(id => { if(a.has(id)) correct++; });
+    const falsePositive = [...p].filter(id => !a.has(id)).length;
+    const missed = [...a].filter(id => !p.has(id)).length;
+
+    if(falsePositive === 0 && missed === 0){
+      message.textContent = "Perfect — bạn xác định đúng toàn bộ cutoff.";
+    } else {
+      message.textContent = `Đúng ${correct}/${a.size} prune roots. Sai ${falsePositive}, bỏ sót ${missed}.`;
+    }
+
+    const stats = treeStats(root);
+    const pr = analyzePruning(root);
+    const rate = Math.round(100 * pr.nodes / Math.max(1, stats.count - 1));
+    score.textContent = `Minimax(root) = ${root.minimax} · Prune roots = ${a.size} · Pruned nodes = ${pr.nodes} (~${rate}%)`;
+    render();
+  }
+
+  document.getElementById("noteMode").addEventListener("click", () => {
+    noteMode = !noteMode;
+    const b = document.getElementById("noteMode");
+    b.textContent = `Note mode: ${noteMode ? "ON" : "OFF"}`;
+    b.classList.toggle("active", noteMode);
+    message.textContent = noteMode
+      ? "Note mode: click node để gõ ngay trên cây · kéo note để di chuyển · double-click note để sửa."
+      : "Note mode đã tắt: click node để đánh dấu prune như bình thường.";
+    render();
+  });
+
+  document.getElementById("newTree").addEventListener("click", newTree);
+  document.getElementById("clearMarks").addEventListener("click", clearMarks);
+  document.getElementById("check").addEventListener("click", checkAnswer);
+  depthInput.addEventListener("change", newTree);
+  branchInput.addEventListener("change", newTree);
+  minBranchInput.addEventListener("change", newTree);
+  rootRoleInput.addEventListener("change", newTree);
+  treeModeInput.addEventListener("change", newTree);
+
+  newTree();
+})();
+</script>
+</body>
+</html>
